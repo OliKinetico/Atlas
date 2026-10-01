@@ -117,3 +117,17 @@ redress_parent_member_id, branch_occurrence, branch_key, company_number_listed, 
 likely_rmc_basis, low_priority, low_priority_reason; the checks above; view columns
 display_name, display_name_note, branch_label, redress_member_id, redress_parent_member_id,
 is_active, low_priority, low_priority_reason, shown_by_default).
+
+### Phase 3 load (1 October 2026, 18:56 UTC)
+
+- Pre-migration snapshots (ingest_runs 9d284302-ceb1-4f1b-9017-ad768c31924f):
+  `raw_source_rows_snapshot_20261001_185551950`, `branches_snapshot_20261001_185552253`,
+  `match_proposals_snapshot_20261001_185552268`. Restore and undo commands are in that row.
+- Migration 20261002000000 applied via the Management API in one transaction.
+- Load run 1 (ingest_runs a7bf5e1b-2a7a-4deb-a522-322d95cb2e88): branches 5,434 inserted
+  (member_address 484, branch 11, ch_registered_office 4,939); match_proposals 194;
+  raw_source_rows 72 inserted, 5,423 updated.
+- Load run 2 (ingest_runs f0cf227b-ea75-45b4-b51f-5f7f84059f49): 0 inserted, 0 updated in all
+  three tables; last_seen_at refreshed on 5,434 unchanged rows.
+- raw_source_rows keeps one stale row, source_record_id `0`, from the first raw write (the
+  ID-0 record the early loader mistook for a member). Never deleted; not loaded as a branch.
