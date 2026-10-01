@@ -160,3 +160,34 @@ between its listed and geocoded outcode; the explanation given for the extra 1 w
   branches_snapshot_20261001_210138844, match_proposals_snapshot_20261001_210148896.
 - Run 2 (ingest_runs 0cf943d9-b88e-4427-9e68-4ba3c68a3320): 0 inserts, 0 updates, 0 marks.
 - Not seen and kept (last_seen_at stays 18:56 UTC): 18269, 24196.
+
+## 2 October 2026 — Phase 4 provisional rulings (unattended run; need Oli's confirmation)
+
+Each takes the most cautious, reversible option. All Phase 4 writes are snapshotted first and
+can be undone with the commands stored in ingest_runs.
+
+- **P1 — branch-list rows link through the parent member only.** Options: (a) match branch rows
+  on their own label/postcode; (b) inherit the parent member's exact link. Chose (b): ruling 12
+  forbids name-matching on the branch label. For the 2 parents with no member row in the area
+  (14143, 19425) the parent's name, postcode and listed number come from their allowlisted raw
+  record. Proposals for those parents attach to their branch rows.
+- **P2 — conflicting exact signals are never auto-linked.** Options: (a) link on the listed
+  company number whenever it exists in the snapshot, as the plan allows; (b) link only when
+  every exact signal (listed number; exact name + postcode) points at one company and the
+  member has no pending duplicate proposal against a different company. Chose (b): it applies
+  ruling 15 to links as well as proposals. Every candidate of a conflicted member becomes a
+  pending proposal carrying `evidence.conflict`. Currently affects member 21287 only.
+- **P3 — what generates branch_company proposals.** For members with no exact link (and for
+  conflicts): (i) exact normalised name at a different postcode; (ii) a different name with
+  Jaro-Winkler similarity >= 0.9 at the same registered-office postcode. Options considered:
+  similarity over the whole snapshot (too broad, noisy) or no similarity at all (misses
+  near-identical names). Chose same-postcode similarity: narrow and reviewable. Members with an
+  exact link get no extra proposals.
+- **P4 — Phase 4 matching is insert-only.** New `companies` rows (from the bulk snapshot, minus
+  RegAddress.CareOf), `branch_company_links` and `match_proposals` are inserted; existing rows are
+  never changed or deleted by the matcher. Company details are refreshed only by the enrichment
+  step from the CH API. Branch rows with `manually_edited = true` get no new link.
+- **Note — listed numbers whose company name differs:** where a PRS member lists a company number
+  that exists in the snapshot, the plan's exact tier links it even if the company's name differs
+  from the member's legal name. These links carry `evidence.name_matches = false` and are listed
+  in the Phase 4 report for spot-checking.
