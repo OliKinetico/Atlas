@@ -59,3 +59,32 @@ through the Management API). Before anyone uses the Supabase CLI against the pro
 supabase migration repair --status applied 20261001000000
 supabase migration repair --status applied 20261002000000   # only once it has been applied
 ```
+
+## 2 October 2026 — gate A1 rulings (Oli)
+
+1. **BranchListJson approved**, parsed. Kept per entry: fdBranchName, address lines,
+   fdPostCode, fdIsActive, fdPropertyAgentId, branch ID (none exists, see below), Latitude,
+   Longitude. Phone, email and fdDisplay* never persisted; `check-personal-data.ts` asserts it
+   on the cache and on raw_source_rows.
+2. Each entry → `source_type = branch`, `trading_name = fdBranchName`, keyed member ID +
+   branch ID; `is_active` stored; inactive branches written but excluded from duplicate
+   proposals and default views.
+3. Branches are scoped by their own postcode against the 78 outcodes, not the member's.
+4. Member addresses: `member_address`, trading_name null (as before).
+5. Repeated member IDs: collapse only if byte-identical; any difference → stop, no winner.
+6. **Migration 20261002000000 approved, including relaxing NOT NULL on `trading_name` and
+   `trading_name_norm`** (explicit decision by Oli). Display name must never be blank.
+7. **Branch → company matching:** name similarity only creates human-review proposals with the
+   match basis recorded; never auto-links. Exact signals (company number; postcode + exact
+   name) may auto-link.
+8. **CH hide rule:** hide where (a) limited by guarantee OR (f) the broader name rule
+   (`likely_rmc = true`, basis recorded). DORMANT is not hidden; it gets a low-priority flag.
+   Implemented in `scripts/ch-candidates.ts`: 542 hidden (388 in scope); 624 dormant flagged
+   low priority, 166 of them also hidden.
+
+**Status: stopped at ruling 5** (third pass, `cache/prs-v3/`). The 78 repeats are 9 member
+IDs that appear twice, identical, plus member ID `0` appearing 70 times with 70 different
+names and postcodes. All 70 ID-0 rows match a BranchListJson entry exactly on name +
+postcode: the API returns branch entries as top-level rows with no member link. Also: no
+branch ID exists (fdPropertyAgentId = parent fdId on all 77 entries; no other ID key).
+Correction to the earlier A2 report: "0" was counted as a valid member ID.

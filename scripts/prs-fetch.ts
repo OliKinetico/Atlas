@@ -15,6 +15,7 @@
 // Usage: pnpm tsx scripts/prs-fetch.ts [--prefix GU] [--from-cache] [--cache-dir cache/prs-v2]
 //   Cached pages are reused (resume). --from-cache makes no network requests at all.
 //   cache/prs/ is the first pass (before the branch-count fields); kept, never overwritten.
+import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { createClient } from "@supabase/supabase-js";
@@ -39,11 +40,29 @@ export const PRS_ALLOWLIST = [
   "fdIsHaveOtherBranch",
   "fdNumberofBranches",
 ] as const;
-export type PrsRecord = Partial<Record<(typeof PRS_ALLOWLIST)[number], string | number | boolean | null>>;
+
+// BranchListJson (a JSON string) is parsed and each entry reduced to these keys (Oli, gate A1
+// ruling 1). Phone, email and the fdDisplay* flags are never kept. A key that looks like a
+// branch's own ID ("Id", "BranchId", "fdBranchId") is kept if the source ever sends one.
+export const PRS_BRANCH_ALLOWLIST = [
+  "fdBranchName",
+  "fdCorrespondanceAddressLine1",
+  "fdCorrespondanceAddressLine2",
+  "fdPostCode",
+  "fdIsActive",
+  "fdPropertyAgentId",
+  "Latitude",
+  "Longitude",
+] as const;
+const BRANCH_ID_KEY = /^(fd)?(branch)?id$/i;
+export type PrsBranch = Record<string, string | number | boolean | null>;
+export type PrsRecord = Partial<Record<(typeof PRS_ALLOWLIST)[number], string | number | boolean | null>> & {
+  BranchListJson?: PrsBranch[];
+};
 
 const PREFIXES = ["GU", "KT", "RH", "TW", "SM", "CR", "TN", "SL"];
 const ENDPOINT = "https://www.portal.propertyredress.co.uk/propertyagent/GetMemberByAPI";
-export const PRS_CACHE_DIR = join("cache", "prs-v2");
+export const PRS_CACHE_DIR = join("cache", "prs-v3");
 const MIN_INTERVAL_MS = 2000;
 const MAX_RETRIES = 3;
 const MAX_CONSECUTIVE_FAILURES = 10;
@@ -82,18 +101,72 @@ const CO_NUMBER_SHAPE = /^(?:[A-Z]{2}\d{6}|\d{1,8})$/i;
  * were found in fdRegisteredCoNo), so any email- or phone-shaped value is dropped, and a
  * company number is kept only if it has a company-number shape. Dropped, never corrected.
  */
+function scalar(v: unknown) {
+  let keep = typeof v === "string" || typeof v === "number" || typeof v === "boolean" ? v : null;
+  if (typeof keep === "string" && (EMAIL_LIKE.test(keep) || PHONE_LIKE.test(keep))) keep = null;
+  return keep;
+}
+
+/** Parse BranchListJson and keep only the branch allowlist. Unparseable → []. */
+export function allowlistBranches(v: unknown): PrsBranch[] {
+  let list: unknown = v;
+  if (typeof v === "string") {
+    try {
+      list = v.trim() ? JSON.parse(v) : [];
+    } catch {
+      list = [];
+    }
+  }
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter((e): e is Record<string, unknown> => !!e && typeof e === "object")
+    .map((e) => {
+      const out: PrsBranch = {};
+      for (const k of PRS_BRANCH_ALLOWLIST) out[k] = scalar(e[k]);
+      for (const k of Object.keys(e)) if (BRANCH_ID_KEY.test(k)) out[k] = scalar(e[k]);
+      return out;
+    });
+}
+
 export function allowlist(raw: unknown): PrsRecord {
   const out: PrsRecord = {};
   if (raw && typeof raw === "object") {
     for (const k of PRS_ALLOWLIST) {
-      const v = (raw as Record<string, unknown>)[k];
-      let keep = typeof v === "string" || typeof v === "number" || typeof v === "boolean" ? v : null;
-      if (typeof keep === "string" && (EMAIL_LIKE.test(keep) || PHONE_LIKE.test(keep))) keep = null;
+      let keep = scalar((raw as Record<string, unknown>)[k]);
       if (k === "fdRegisteredCoNo" && keep != null && !CO_NUMBER_SHAPE.test(String(keep).replace(/\s/g, ""))) keep = null;
       out[k] = keep;
     }
+    out.BranchListJson = allowlistBranches((raw as Record<string, unknown>).BranchListJson);
   }
   return out;
+}
+
+// In-memory analyses (names, counts and hashes only; hashes never leave memory).
+const hash = (v: unknown) => createHash("sha256").update(JSON.stringify(v ?? null)).digest("hex");
+const seenRaw = new Map<string, { whole: string; fields: Record<string, string>; allowlisted: string }>();
+const dupes = { repeats: 0, identical_raw: 0, identical_allowlisted: 0, differing_fields: {} as Record<string, number> };
+const branchIds = { entries: 0, agentId_equals_member_fdId: 0, agentId_equals_member_fdAgentTableId: 0, agentId_values: new Set<string>(), other_id_keys: new Set<string>() };
+function analyse(raw: Record<string, unknown>, kept: PrsRecord) {
+  const id = String(raw.fdId);
+  const fields = Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, hash(v)]));
+  const cur = { whole: hash(raw), fields, allowlisted: hash(kept) };
+  const prev = seenRaw.get(id);
+  if (prev) {
+    dupes.repeats++;
+    if (prev.whole === cur.whole) dupes.identical_raw++;
+    if (prev.allowlisted === cur.allowlisted) dupes.identical_allowlisted++;
+    for (const k of new Set([...Object.keys(prev.fields), ...Object.keys(fields)])) {
+      if (prev.fields[k] !== fields[k]) dupes.differing_fields[k] = (dupes.differing_fields[k] ?? 0) + 1;
+    }
+  } else seenRaw.set(id, cur);
+  for (const b of allowlistBranches(raw.BranchListJson)) {
+    branchIds.entries++;
+    const a = String(b.fdPropertyAgentId);
+    branchIds.agentId_values.add(a);
+    if (a === String(raw.fdId)) branchIds.agentId_equals_member_fdId++;
+    if (a === String(raw.fdAgentTableId)) branchIds.agentId_equals_member_fdAgentTableId++;
+    for (const k of Object.keys(b)) if (BRANCH_ID_KEY.test(k)) branchIds.other_id_keys.add(k);
+  }
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -142,7 +215,11 @@ async function fetchPage(prefix: string, page: number): Promise<PrsRecord[] | nu
           return null;
         }
         body.forEach(addToCensus);
-        return body.map(allowlist);
+        return body.map((r) => {
+          const kept = allowlist(r);
+          analyse(r as Record<string, unknown>, kept);
+          return kept;
+        });
       }
     } catch (e) {
       if (e instanceof StopRun) throw e;
@@ -217,7 +294,27 @@ async function main() {
   writeFileSync(join(CACHE, "failures.json"), JSON.stringify({ failures, oddPayloads }, null, 1));
   if (census.size) {
     const rows = [...census].map(([field, c]) => ({ field, present: c.present, non_empty: c.nonEmpty }));
-    writeFileSync(join(CACHE, "census.json"), JSON.stringify(rows, null, 1));
+    const analysis = {
+      fields: rows,
+      // differing_fields as a list so field names are values, not keys (the personal-data
+      // checker rejects keys that look like contact fields).
+      duplicate_member_ids: {
+        unique: seenRaw.size,
+        repeats: dupes.repeats,
+        identical_raw: dupes.identical_raw,
+        identical_allowlisted: dupes.identical_allowlisted,
+        differing_fields: Object.entries(dupes.differing_fields).map(([field, count]) => ({ field, count })),
+      },
+      branch_ids: {
+        entries: branchIds.entries,
+        distinct_fdPropertyAgentId: branchIds.agentId_values.size,
+        agentId_equals_member_fdId: branchIds.agentId_equals_member_fdId,
+        agentId_equals_member_fdAgentTableId: branchIds.agentId_equals_member_fdAgentTableId,
+        other_id_keys: [...branchIds.other_id_keys],
+      },
+    };
+    writeFileSync(join(CACHE, "census.json"), JSON.stringify(analysis, null, 1));
+    console.log(`analysis: ${JSON.stringify({ duplicate_member_ids: analysis.duplicate_member_ids, branch_ids: analysis.branch_ids })}`);
   }
   const total = Object.values(counts).reduce((s, c) => s + c.records, 0);
   const notes = JSON.stringify({ counts, requests, failures: failures.length, oddPayloads, stopReason });

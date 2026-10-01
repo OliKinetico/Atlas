@@ -1,13 +1,15 @@
 // Proves no personal contact fields are stored or cached (Phase 3 acceptance, ruling 0R.1).
 // Checks: (1) every JSON file under /cache for forbidden keys and for email- or phone-shaped
 // values; (2) every raw_source_rows payload in the database for the same; (3) any key outside
-// the per-source allowlist. Reports counts and offending key NAMES only, never values.
+// the per-source allowlist. PRS branch entries (BranchListJson) are checked against the branch
+// allowlist and must never carry phone, email or display-flag fields (gate A1 ruling 1).
+// Reports counts and offending key NAMES only, never values.
 //
 // Usage: pnpm tsx scripts/check-personal-data.ts      (exit code 1 on any finding)
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { createClient } from "@supabase/supabase-js";
-import { PRS_ALLOWLIST } from "./prs-fetch";
+import { PRS_ALLOWLIST, PRS_BRANCH_ALLOWLIST } from "./prs-fetch";
 
 const FORBIDDEN_KEYS = [
   "fdTitle", "fdFirstName", "fdLastName", "fdTelephoneNo", "fdEmail", "fdUserId", "fdUserName",
@@ -18,9 +20,27 @@ const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
 const UK_PHONE = /(?:\+44\s?|\b0)(?:\d\s?){9,10}\b/;
 const CH_KEYS = new Set([
   "company_number", "name", "status", "category", "address_lines", "post_town", "county", "postcode",
-  "outcode", "sic_codes", "incorporated_on", "accounts_category", "last_accounts_made_up_to", "likely_rmc",
+  "outcode", "sic_codes", "incorporated_on", "accounts_category", "last_accounts_made_up_to", "likely_rmc", "likely_rmc_basis", "low_priority",
 ]);
-const PRS_KEYS = new Set<string>(PRS_ALLOWLIST);
+const PRS_KEYS = new Set<string>([...PRS_ALLOWLIST, "BranchListJson"]);
+const BRANCH_KEYS = new Set<string>(PRS_BRANCH_ALLOWLIST);
+const BRANCH_FORBIDDEN = ["fdTelephoneNo", "fdEmail", "fdDisplayAddress", "fdDisplayTelephone", "fdDisplayEmail"];
+let branchEntries = 0;
+
+/** A PRS record: top level against the PRS allowlist, each branch entry against the branch one. */
+function walkPrs(r: unknown, where: string) {
+  walk(r, where, PRS_KEYS);
+  const list = r && typeof r === "object" ? (r as { BranchListJson?: unknown }).BranchListJson : undefined;
+  if (list === undefined) return;
+  if (!Array.isArray(list)) return void findings.push({ where, issue: "BranchListJson is not a parsed array" });
+  for (const b of list) {
+    branchEntries++;
+    for (const k of Object.keys(b ?? {})) {
+      if (BRANCH_FORBIDDEN.includes(k)) findings.push({ where, issue: `branch entry has forbidden key "${k}"` });
+      if (!BRANCH_KEYS.has(k) && !/^(fd)?(branch)?id$/i.test(k)) findings.push({ where, issue: `branch key "${k}" not on allowlist` });
+    }
+  }
+}
 
 type Finding = { where: string; issue: string };
 const findings: Finding[] = [];
@@ -56,7 +76,7 @@ async function main() {
   const cacheFiles = files("cache").filter((f) => f.endsWith(".json"));
   for (const f of cacheFiles) {
     const data = JSON.parse(readFileSync(f, "utf8"));
-    if (f.startsWith(join("cache", "prs")) && /page-\d+\.json$/.test(f)) data.forEach((r: unknown) => walk(r, f, PRS_KEYS));
+    if (f.startsWith(join("cache", "prs")) && /page-\d+\.json$/.test(f)) data.forEach((r: unknown) => walkPrs(r, f));
     else if (f === join("cache", "ch", "candidates.json")) data.candidates.forEach((r: unknown) => walk(r, f, CH_KEYS));
     else walk(data, f);
   }
@@ -69,11 +89,12 @@ async function main() {
   for (let from = 0; ; from += 1000) {
     const { data, error } = await db.from("raw_source_rows").select("source, source_record_id, payload").range(from, from + 999);
     if (error) throw new Error(`raw_source_rows: ${error.message}`);
-    for (const r of data ?? []) walk(r.payload, `raw_source_rows ${r.source}`, r.source === "prs" ? PRS_KEYS : CH_KEYS);
+    for (const r of data ?? []) if (r.source === "prs") walkPrs(r.payload, "raw_source_rows prs");
+    else walk(r.payload, `raw_source_rows ${r.source}`, CH_KEYS);
     n += data?.length ?? 0;
     if (!data || data.length < 1000) break;
   }
-  console.log(`raw_source_rows: ${n} payloads scanned`);
+  console.log(`raw_source_rows: ${n} payloads scanned; branch entries checked (cache + db): ${branchEntries}`);
 
   const grouped = new Map<string, number>();
   for (const f of findings) {

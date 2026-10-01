@@ -69,7 +69,10 @@ type PioResult = {
 
 async function main() {
   const wanted = new Set<string>();
-  for (const { record } of readPrsCache()) wanted.add(normPostcode(record.fdPostCode));
+  for (const { record } of readPrsCache()) {
+    wanted.add(normPostcode(record.fdPostCode));
+    for (const br of record.BranchListJson ?? []) wanted.add(normPostcode(br.fdPostCode));
+  }
   if (existsSync("cache/ch/candidates.json")) {
     const ch = JSON.parse(readFileSync("cache/ch/candidates.json", "utf8")).candidates as ChCandidate[];
     for (const c of ch) wanted.add(normPostcode(c.postcode));

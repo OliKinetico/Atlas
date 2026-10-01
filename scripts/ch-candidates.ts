@@ -11,8 +11,25 @@ import { readFileSync, readdirSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { DuckDBInstance } from "@duckdb/node-api";
 
+// Original four-word rule (0R.5), kept for comparison.
 const RMC_PATTERN = /\bresidents\b|\brtm\b|\bfreehold\b|management company/i;
 export const isLikelyRmc = (name: string) => RMC_PATTERN.test(name);
+
+// Approved hide rule (Oli, 2 Oct 2026): hide where (a) limited by guarantee OR (f) the broader
+// name rule. f = the four terms, "right to manage", or "management" together with a place word
+// or a street number. Tested in scripts/ch-signals.ts: 0 of 161 known agents hit.
+const PLACE_WORD = /\b(court|house|lodge|mansions|close|gardens|place|road|flats|estate)\b|\b\d+[a-z]?\b/i;
+export const matchesBroadNameRule = (name: string) =>
+  RMC_PATTERN.test(name) || /right to manage/i.test(name) || (/\bmanagement\b/i.test(name) && PLACE_WORD.test(name));
+export const isLimitedByGuarantee = (category: string | null) => /guarantee/i.test(category ?? "");
+export function rmcBasis(name: string, category: string | null): string[] {
+  return [
+    ...(isLimitedByGuarantee(category) ? ["limited_by_guarantee"] : []),
+    ...(matchesBroadNameRule(name) ? ["name_rule"] : []),
+  ];
+}
+/** Dormant companies are not hidden, only marked low priority (Oli, 2 Oct 2026). */
+export const isDormant = (accountsCategory: string | null) => /^dormant$/i.test((accountsCategory ?? "").trim());
 
 export type ChCandidate = {
   company_number: string;
@@ -29,6 +46,8 @@ export type ChCandidate = {
   accounts_category: string | null;
   last_accounts_made_up_to: string | null;
   likely_rmc: boolean;
+  likely_rmc_basis: string[];
+  low_priority: boolean;
 };
 
 function findCsv(): string {
@@ -110,7 +129,9 @@ async function main() {
       incorporated_on: isoDate(r.incorporated_on),
       accounts_category: typeof r.accounts_category === "string" ? r.accounts_category : null,
       last_accounts_made_up_to: isoDate(r.last_made_up),
-      likely_rmc: isLikelyRmc(name),
+      likely_rmc: rmcBasis(name, String(r.category ?? "")).length > 0,
+      likely_rmc_basis: rmcBasis(name, String(r.category ?? "")),
+      low_priority: isDormant(typeof r.accounts_category === "string" ? r.accounts_category : null),
     };
   });
 
@@ -118,7 +139,8 @@ async function main() {
   writeFileSync("cache/ch/candidates.json", JSON.stringify({ snapshot: csv, extracted_at: new Date().toISOString(), candidates: out }, null, 1));
   const rmc = out.filter((c) => c.likely_rmc).length;
   console.log(`snapshot rows: ${total}; candidates (active, SIC 68310/68320, approved outcode): ${out.length}`);
-  console.log(`likely_rmc: ${rmc}; enrichable: ${out.length - rmc}`);
+  console.log(`likely_rmc (hidden: guarantee or name rule): ${rmc}; enrichable: ${out.length - rmc}; old four-word rule: ${out.filter((c) => isLikelyRmc(c.name)).length}`);
+  console.log(`low_priority (dormant, not hidden): ${out.filter((c) => c.low_priority).length}; of which also hidden: ${out.filter((c) => c.low_priority && c.likely_rmc).length}`);
   console.log(`by SIC: 68310=${out.filter((c) => c.sic_codes.includes("68310")).length}, 68320=${out.filter((c) => c.sic_codes.includes("68320")).length}`);
 }
 

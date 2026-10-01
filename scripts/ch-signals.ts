@@ -7,7 +7,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { DuckDBInstance } from "@duckdb/node-api";
-import type { ChCandidate } from "./ch-candidates";
+import { isLikelyRmc, matchesBroadNameRule, type ChCandidate } from "./ch-candidates";
 import { loadLookup, loadSurreyDistricts, normPostcode } from "./geocode";
 import { readPrsCache } from "./prs-fetch";
 
@@ -19,9 +19,8 @@ const big = (v: unknown) => (typeof v === "bigint" ? Number(v) : v);
 const jsonish = (rows: Record<string, unknown>[]) => rows.map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, big(v)])));
 
 // Existing four-word rule (0R.5) and the broader rule under test (signal f).
-const RMC4 = /\bresidents\b|\brtm\b|\bfreehold\b|management company/i;
-const BROAD_PLACE = /\b(court|house|lodge|mansions|close|gardens|place|road|flats|estate)\b|\b\d+[a-z]?\b/i;
-const broadName = (n: string) => RMC4.test(n) || /right to manage/i.test(n) || (/\bmanagement\b/i.test(n) && BROAD_PLACE.test(n));
+const RMC4 = { test: isLikelyRmc };
+const broadName = matchesBroadNameRule;
 
 /** Deterministic PRNG so the samples are reproducible. */
 function rng(seed: number) {
