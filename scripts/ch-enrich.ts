@@ -196,6 +196,14 @@ async function main() {
 
   if (doFetch) {
     mkdirSync(DIR, { recursive: true });
+    // Seed the rate window from the request log so a restarted run cannot exceed the limit
+    // across the restart (requests sent in the last 300 s still count).
+    if (existsSync(LOG)) {
+      const cutoff = Date.now() - WINDOW_MS;
+      const recent = readFileSync(LOG, "utf8").trim().split("\n").filter(Boolean).map((l) => Date.parse((JSON.parse(l) as { t: string }).t)).filter((t) => t > cutoff).sort((x, y) => x - y);
+      sent.push(...recent);
+      console.log(`rate window seeded with ${recent.length} requests from the last 300 s`);
+    }
     let stop: string | undefined;
     try {
       let i = 0;
