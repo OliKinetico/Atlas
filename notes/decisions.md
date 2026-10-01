@@ -191,3 +191,25 @@ can be undone with the commands stored in ingest_runs.
   that exists in the snapshot, the plan's exact tier links it even if the company's name differs
   from the member's legal name. These links carry `evidence.name_matches = false` and are listed
   in the Phase 4 report for spot-checking.
+- **P5 — which companies are enriched from the CH API.** Options: all 5,134 linked companies;
+  or only those linked to an in-scope branch with `likely_rmc = false` (0R.5). Chose the latter
+  (2,829 companies): it covers every Surrey branch on the map and roughly halves the API calls.
+  The other 2,305 linked companies (outside Surrey or likely residents' management companies)
+  keep their bulk-snapshot company row with no officers or PSCs; they can be enriched later.
+- **P6 — CH API pace.** At most 500 requests in any 300-second window and at least 610 ms between
+  requests (documented limit: 600 per 5 minutes). A 429, 401 or 403 stops the source at once
+  (Phase 4 brief: stop a source if rate-limited), rather than backing off and continuing.
+- **P7 — what is cached and stored from the CH API.** Officers: name, role, appointed/resigned
+  dates, month and year of birth. PSCs: name, kind, notified/ceased dates, corporate
+  identification. Addresses, nationality, occupation and country of residence are dropped
+  before caching. PSC entries with no name (e.g. super-secure PSCs) are not stored, because
+  `pscs.name` is NOT NULL and names are never invented; they are counted in the report. A PSC
+  chain follows an active corporate PSC only when the source gives a UK register and a
+  Companies House-shaped number, and only when it is the company's single such PSC; with two
+  or more, the candidates are recorded and the chain stops (no guess at which one controls).
+- **P8 — Vercel framework.** Every Vercel deployment of this branch failed with "No Output
+  Directory named 'public'" because the project's framework preset is unset. Options: change
+  the project setting in Oli's Vercel account, or add `vercel.json` with `"framework":
+  "nextjs"` to the repo. Chose the repo file: visible in the PR, reversible by deleting it,
+  and it changes nothing in the account. The project's environment variables are still unset;
+  only Oli sets their values (passing secrets through this session is not acceptable).
