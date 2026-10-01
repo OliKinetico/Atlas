@@ -304,6 +304,11 @@ function build() {
       }
       branchMembersIn78.add(grp.memberId);
       const occurrence = i + 1;
+      // Ruling 14: a label equal to the member name (ignoring case and whitespace) is dropped
+      // so the display name is the member name alone. The label as listed stays in sources.
+      const label = str(d.b.fdBranchName);
+      const squash = (v: string) => v.toLowerCase().replace(/\s+/g, "");
+      const labelIsMemberName = !!label && squash(label) === squash(str(parent.fdCompanyName));
       const branchKey = `${grp.memberId}|${grp.labelNorm}|${grp.pc}|${occurrence}`;
       const row: BranchRow = {
         trading_name: null, // ruling 12: fdBranchName is a location label, not a trading name
@@ -315,7 +320,7 @@ function build() {
         outcode: g.outcode,
         source_type: "branch",
         source_company_number: null,
-        branch_label: str(d.b.fdBranchName) || null,
+        branch_label: labelIsMemberName ? null : label || null,
         redress_parent_member_id: grp.memberId,
         branch_occurrence: occurrence,
         branch_key: branchKey,
@@ -338,6 +343,7 @@ function build() {
             kind: "member branch-list entry",
             parent_member_id: grp.memberId,
             list_positions: d.positions, // evidence only, never part of the key
+            ...(labelIsMemberName ? { branch_label_as_listed: label, label_dropped: "equals member name (ruling 14)" } : {}),
             listed_times: d.positions.length,
             source_coordinates: { lat: d.b.Latitude ?? null, lng: d.b.Longitude ?? null },
           },
@@ -540,12 +546,16 @@ async function loadBranches(db: SupabaseClient, built: Built[], snaps: Snap[]) {
   const inserts: BranchRow[] = [];
   const updates: { id: string; row: BranchRow }[] = [];
   const touch: string[] = [];
+  const changes: { key: string; columns: string[] }[] = [];
   let skippedManual = 0;
   for (const { key, row } of built) {
     const e = byKey.get(key);
     if (!e) inserts.push(row);
     else if (e.manually_edited) skippedManual++;
-    else if (ROW_COLUMNS.some((c) => canon(e[c]) !== canon(row[c]))) updates.push({ id: e.id, row });
+    else if (ROW_COLUMNS.some((c) => canon(e[c]) !== canon(row[c]))) {
+      updates.push({ id: e.id, row });
+      changes.push({ key, columns: ROW_COLUMNS.filter((c) => canon(e[c]) !== canon(row[c])) });
+    }
     else touch.push(e.id);
   }
   for (let i = 0; i < inserts.length; i += 500) {
@@ -564,10 +574,13 @@ async function loadBranches(db: SupabaseClient, built: Built[], snaps: Snap[]) {
   const wanted = new Set(built.map((b) => b.key));
   return {
     inserted: inserts.length,
-    updated: updates.length,
+    updated_count: updates.length,
     unchanged_last_seen_refreshed: touch.length,
     skipped_manually_edited: skippedManual,
     not_seen_this_load: existing.filter((e) => !wanted.has(keyOf(e))).length, // never deleted
+    inserted_keys: inserts.map((r) => keyOf(r)),
+    updated: changes,
+    not_seen_keys: existing.filter((e) => !wanted.has(keyOf(e))).map((e) => keyOf(e)),
   };
 }
 
@@ -589,7 +602,30 @@ async function loadProposals(db: SupabaseClient, pairs: Pair[], snaps: Snap[]) {
     const { error } = await db.from("match_proposals").insert(inserts.slice(i, i + 500));
     if (error) throw new Error(`match_proposals insert: ${error.message}`);
   }
-  return { inserted: inserts.length, already_present: pairs.length - inserts.length };
+
+  // Ruling 15: a member with pending proposals against two or more different companies is a
+  // conflict. Marked in evidence (no schema change); none is accepted automatically.
+  const pending = await readAll<{ id: string; status: string; evidence: Record<string, unknown> }>(db, "match_proposals", "id, status, evidence", ["kind", "branch_duplicate"]);
+  const byMember = new Map<string, typeof pending>();
+  for (const p of pending.filter((x) => x.status === "pending")) {
+    const m = String(p.evidence.subject_member_id ?? "");
+    if (m) byMember.set(m, [...(byMember.get(m) ?? []), p]);
+  }
+  let conflictMarked = 0;
+  const conflictMembers: string[] = [];
+  for (const [member, ps] of byMember) {
+    const companies = [...new Set(ps.map((p) => String(p.evidence.other_company_number ?? "")).filter(Boolean))].sort();
+    if (companies.length < 2) continue;
+    conflictMembers.push(member);
+    const conflict = { rule: "ruling 15", member_id: member, companies, note: "member has pending proposals against more than one company; review together, never accept automatically" };
+    for (const p of ps) {
+      if (canon(p.evidence.conflict) === canon(conflict)) continue;
+      const { error } = await db.from("match_proposals").update({ evidence: { ...p.evidence, conflict } }).eq("id", p.id).eq("status", "pending");
+      if (error) throw new Error(`match_proposals conflict mark: ${error.message}`);
+      conflictMarked++;
+    }
+  }
+  return { inserted: inserts.length, already_present: pairs.length - inserts.length, conflict_members: conflictMembers, conflict_proposals_marked: conflictMarked };
 }
 
 async function main() {
@@ -639,7 +675,7 @@ async function main() {
   const { data: run, error: runErr } = await db.from("ingest_runs").insert({ script, rows_read: built.length + raws.length }).select("id").single();
   if (runErr) throw runErr;
 
-  const out: Record<string, Record<string, number>> = {};
+  const out: Record<string, Record<string, unknown>> = {};
   const snaps: Snap[] = [];
   try {
     if (writeRaw) out.raw_source_rows = await loadRaw(db, raws, run.id, snaps);
@@ -648,7 +684,8 @@ async function main() {
       out.match_proposals = await loadProposals(db, pairs, snaps);
     }
   } finally {
-    const written = Object.values(out).reduce((s, o) => s + (o.inserted ?? 0) + (o.updated ?? 0), 0);
+    const n = (v: unknown) => (typeof v === "number" ? v : 0);
+    const written = Object.values(out).reduce((s, o) => s + n(o.inserted) + n(o.updated) + n(o.updated_count) + n(o.conflict_proposals_marked), 0);
     await db
       .from("ingest_runs")
       .update({

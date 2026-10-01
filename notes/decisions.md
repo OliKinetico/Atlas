@@ -131,3 +131,20 @@ is_active, low_priority, low_priority_reason, shown_by_default).
   three tables; last_seen_at refreshed on 5,434 unchanged rows.
 - raw_source_rows keeps one stale row, source_record_id `0`, from the first raw write (the
   ID-0 record the early loader mistook for a member). Never deleted; not loaded as a branch.
+
+## 1 October 2026 — correction pass rulings (Oli)
+
+14. **Amends ruling 12:** when a branch label equals the member name, ignoring case and
+    whitespace, the display name is the member name alone. Applied in the loader without a
+    schema change: `branch_label` is stored null for such rows (so `branch_overview` shows the
+    parent legal name alone) and the label as listed is kept in `sources.branch_label_as_listed`
+    with `label_dropped = "equals member name (ruling 14)"`. The branch key still uses the label
+    as listed, so the row keeps its identity.
+15. **Conflicts:** a member with pending proposals against two or more different companies is a
+    conflict. None of its proposals is accepted automatically; they are reviewed together.
+    Marked without a schema change in `match_proposals.evidence.conflict`
+    (rule, member_id, companies, note). The loader re-applies the mark on every run.
+
+Correction to the narrow-query sweep report: the fetched total across the 78 outcodes is 484,
+not 485 (387 + 97). Narrow and fetched both total 484. No member's in-area status differs
+between its listed and geocoded outcode; the explanation given for the extra 1 was wrong.

@@ -62,7 +62,9 @@ export type PrsRecord = Partial<Record<(typeof PRS_ALLOWLIST)[number], string | 
 
 const PREFIXES = ["GU", "KT", "RH", "TW", "SM", "CR", "TN", "SL"];
 const ENDPOINT = "https://www.portal.propertyredress.co.uk/propertyagent/GetMemberByAPI";
-export const PRS_CACHE_DIR = join("cache", "prs-v3");
+// Each full re-fetch goes to a new folder; earlier passes are kept, never overwritten.
+// prs (pass 1), prs-v2 (branch-count fields), prs-v3 (BranchListJson), prs-v4 (correction pass).
+export const PRS_CACHE_DIR = join("cache", "prs-v4");
 const MIN_INTERVAL_MS = 2000;
 const MAX_RETRIES = 3;
 const MAX_CONSECUTIVE_FAILURES = 10;
