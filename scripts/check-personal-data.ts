@@ -26,6 +26,21 @@ const PRS_KEYS = new Set<string>([...PRS_ALLOWLIST, "BranchListJson"]);
 const BRANCH_KEYS = new Set<string>(PRS_BRANCH_ALLOWLIST);
 const BRANCH_FORBIDDEN = ["fdTelephoneNo", "fdEmail", "fdDisplayAddress", "fdDisplayTelephone", "fdDisplayEmail"];
 let branchEntries = 0;
+// Companies House API cache (Phase 4, P7): officer and PSC items keep only these keys.
+const CH_OFFICER_KEYS = new Set(["name", "officer_role", "appointed_on", "resigned_on", "date_of_birth"]);
+const CH_PSC_KEYS = new Set(["name", "kind", "notified_on", "ceased_on", "identification"]);
+const CH_DOB_KEYS = new Set(["month", "year"]);
+let chItems = 0;
+function walkChApi(f: string, data: { data?: unknown }) {
+  const items = Array.isArray(data.data) ? (data.data as Record<string, unknown>[]) : [];
+  const allowed = f.endsWith("officers.json") ? CH_OFFICER_KEYS : f.endsWith("pscs.json") ? CH_PSC_KEYS : null;
+  for (const it of items) {
+    chItems++;
+    for (const k of Object.keys(it)) if (allowed && !allowed.has(k)) findings.push({ where: f, issue: `CH item key "${k}" not on allowlist` });
+    const dob = it.date_of_birth as Record<string, unknown> | null | undefined;
+    if (dob) for (const k of Object.keys(dob)) if (!CH_DOB_KEYS.has(k)) findings.push({ where: f, issue: `date_of_birth key "${k}" not allowed` });
+  }
+}
 
 /** A PRS record: top level against the PRS allowlist, each branch entry against the branch one. */
 function walkPrs(r: unknown, where: string) {
@@ -78,9 +93,13 @@ async function main() {
     const data = JSON.parse(readFileSync(f, "utf8"));
     if (f.startsWith(join("cache", "prs")) && /page-\d+\.json$/.test(f)) data.forEach((r: unknown) => walkPrs(r, f));
     else if (f === join("cache", "ch", "candidates.json")) data.candidates.forEach((r: unknown) => walk(r, f, CH_KEYS));
+    else if (f.startsWith(join("cache", "ch", "api"))) {
+      walkChApi(f, data);
+      walk(data, f);
+    }
     else walk(data, f);
   }
-  console.log(`cache: ${cacheFiles.length} JSON files scanned`);
+  console.log(`cache: ${cacheFiles.length} JSON files scanned; CH API officer/PSC items checked: ${chItems}`);
 
   const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
     auth: { persistSession: false, autoRefreshToken: false },
