@@ -14,3 +14,12 @@
   hold. It restores changed and deleted rows; rows added after the snapshot stay. Rows with
   `manually_edited = true` are protected by a trigger, including during a restore.
 - **Next.js 16 renamed middleware to proxy**: route protection is `src/proxy.ts`.
+
+## 1 October 2026 (session 3)
+
+- **Phase 2 applied to the live project** via the Supabase Management API (one transaction).
+  `supabase_migrations.schema_migrations` did not exist, so nothing was recorded there. Before
+  anyone runs `supabase db push` against this project, run
+  `supabase migration repair --status applied 20261001000000` so the CLI does not re-apply it.
+- **RLS tests** (`scripts/test-rls.ts`) run against the live project: 119/119 checks passed.
+  Test users use the reserved `.invalid` TLD and are deleted at the end.

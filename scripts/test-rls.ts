@@ -31,8 +31,9 @@ const TAG = "RLS-TEST";
 const CO = "RLSTEST1"; // not a valid CH number format, so it cannot collide with real data
 
 type Row = Record<string, unknown>;
+type Key = Record<string, string>;
 // FK order. `key` identifies the test row; `mutate` is a harmless update to attempt.
-type Spec = { table: string; row: () => Row; key: Row; mutate: Row };
+type Spec = { table: string; row: () => Row; key: Key; mutate: Row };
 const ids: Record<string, string> = {};
 
 const specs: Spec[] = [
@@ -110,20 +111,14 @@ function record(table: string, check: string, pass: boolean, detail?: string) {
   results.push({ table, check, pass, detail });
 }
 
-function applyKey<T extends { eq: (c: string, v: unknown) => T }>(q: T, key: Row): T {
-  for (const [c, v] of Object.entries(key)) q = q.eq(c, v);
-  return q;
-}
-
-async function readCount(db: SupabaseClient, table: string, key?: Row) {
-  let q = db.from(table).select("*");
-  if (key) q = applyKey(q, key);
-  const { data, error } = await q;
+async function readCount(db: SupabaseClient, table: string, key?: Key) {
+  const q = db.from(table).select("*");
+  const { data, error } = await (key ? q.match(key) : q);
   return { n: data?.length ?? 0, error };
 }
 
-async function serviceRowSnapshot(table: string, key: Row) {
-  const { data, error } = await applyKey(admin.from(table).select("*"), key);
+async function serviceRowSnapshot(table: string, key: Key) {
+  const { data, error } = await admin.from(table).select("*").match(key);
   if (error) throw new Error(`service read ${table}: ${error.message}`);
   return JSON.stringify(data);
 }
@@ -153,7 +148,7 @@ async function deleteTestUsers() {
 async function cleanupRows() {
   // Reverse FK order; service role so cleanup works even if a check failed midway.
   for (const s of [...specs].reverse()) {
-    const { error } = await applyKey(admin.from(s.table).delete(), s.key);
+    const { error } = await admin.from(s.table).delete().match(s.key);
     if (error) console.error(`cleanup ${s.table}: ${error.message}`);
   }
 }
@@ -192,7 +187,7 @@ async function main() {
       record(s.table, "(c) allowlisted insert", ok, error?.message);
       const r = await readCount(allowed, s.table, s.key);
       record(s.table, "(c) allowlisted read", !r.error && r.n === 1, r.error?.message ?? `rows=${r.n}`);
-      const { data: up, error: upErr } = await applyKey(allowed.from(s.table).update(s.mutate), s.key).select();
+      const { data: up, error: upErr } = await allowed.from(s.table).update(s.mutate).match(s.key).select();
       record(s.table, "(c) allowlisted update", !upErr && up?.length === 1, upErr?.message ?? `rows=${up?.length}`);
     }
     {
@@ -211,8 +206,8 @@ async function main() {
         const ins = await db.from(s.table).insert(s.row()).select();
         record(s.table, `${label} insert blocked`, ins.error?.code === "42501", ins.error ? `${ins.error.code}` : "insert succeeded");
 
-        const up = await applyKey(db.from(s.table).update(s.mutate), s.key).select();
-        const del = await applyKey(db.from(s.table).delete(), s.key).select();
+        const up = await db.from(s.table).update(s.mutate).match(s.key).select();
+        const del = await db.from(s.table).delete().match(s.key).select();
         const after = await serviceRowSnapshot(s.table, s.key);
         const unchanged = before === after && (up.data?.length ?? 0) === 0 && (del.data?.length ?? 0) === 0;
         record(s.table, `${label} update/delete blocked`, unchanged, unchanged ? "row unchanged" : "row changed");
@@ -231,7 +226,7 @@ async function main() {
 
     // (c) allowlisted user can delete (reverse FK order) — the final write check.
     for (const s of [...specs].reverse()) {
-      const { data, error } = await applyKey(allowed.from(s.table).delete(), s.key).select();
+      const { data, error } = await allowed.from(s.table).delete().match(s.key).select();
       record(s.table, "(c) allowlisted delete", !error && data?.length === 1, error?.message ?? `rows=${data?.length}`);
     }
   } finally {
