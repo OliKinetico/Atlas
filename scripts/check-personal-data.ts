@@ -56,7 +56,7 @@ async function main() {
   const cacheFiles = files("cache").filter((f) => f.endsWith(".json"));
   for (const f of cacheFiles) {
     const data = JSON.parse(readFileSync(f, "utf8"));
-    if (f.startsWith(join("cache", "prs")) && Array.isArray(data)) data.forEach((r) => walk(r, f, PRS_KEYS));
+    if (f.startsWith(join("cache", "prs")) && /page-\d+\.json$/.test(f)) data.forEach((r: unknown) => walk(r, f, PRS_KEYS));
     else if (f === join("cache", "ch", "candidates.json")) data.candidates.forEach((r: unknown) => walk(r, f, CH_KEYS));
     else walk(data, f);
   }

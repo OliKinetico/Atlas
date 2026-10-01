@@ -1,5 +1,5 @@
 // Phase 3 step 1: fetch Property Redress (PRS) members for the approved postcode prefixes and
-// cache them to /cache/prs/, keeping ONLY the business-field allowlist (ruling 0R.1).
+// cache them to /cache/prs-v2/ (or --cache-dir), keeping ONLY the business-field allowlist (ruling 0R.1).
 // The raw response never touches disk or logs: it is filtered in memory, then written.
 //
 // Note: the endpoint's postcode filter is a substring match ("GU" also matches "N1 7GU"),
@@ -9,8 +9,12 @@
 // up to 3 retries per page with exponential backoff on network errors; 403/429 backs off and
 // three blocks stop the run; 10 consecutive failed requests stop the run. One honest UA.
 //
-// Usage: pnpm tsx scripts/prs-fetch.ts [--prefix GU] [--from-cache]
+// Each run also writes <cache>/census.json: every field NAME the source returned, with how
+// many records had it and how many had a non-empty value. Names and counts only, no values.
+//
+// Usage: pnpm tsx scripts/prs-fetch.ts [--prefix GU] [--from-cache] [--cache-dir cache/prs-v2]
 //   Cached pages are reused (resume). --from-cache makes no network requests at all.
+//   cache/prs/ is the first pass (before the branch-count fields); kept, never overwritten.
 import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { createClient } from "@supabase/supabase-js";
@@ -31,12 +35,15 @@ export const PRS_ALLOWLIST = [
   "fdPostCode",
   "MemberStatus",
   "fdWorkType",
+  // Self-declared by the member, not verified (Oli, Phase 3 ruling B4).
+  "fdIsHaveOtherBranch",
+  "fdNumberofBranches",
 ] as const;
-export type PrsRecord = Partial<Record<(typeof PRS_ALLOWLIST)[number], string | number | null>>;
+export type PrsRecord = Partial<Record<(typeof PRS_ALLOWLIST)[number], string | number | boolean | null>>;
 
 const PREFIXES = ["GU", "KT", "RH", "TW", "SM", "CR", "TN", "SL"];
 const ENDPOINT = "https://www.portal.propertyredress.co.uk/propertyagent/GetMemberByAPI";
-const CACHE = join(process.cwd(), "cache", "prs");
+export const PRS_CACHE_DIR = join("cache", "prs-v2");
 const MIN_INTERVAL_MS = 2000;
 const MAX_RETRIES = 3;
 const MAX_CONSECUTIVE_FAILURES = 10;
@@ -46,6 +53,24 @@ const MAX_PAGES = 1000; // safety stop per prefix
 const args = process.argv.slice(2);
 const fromCache = args.includes("--from-cache");
 const onlyPrefix = args.includes("--prefix") ? args[args.indexOf("--prefix") + 1]?.toUpperCase() : undefined;
+const CACHE = args.includes("--cache-dir") ? args[args.indexOf("--cache-dir") + 1] : PRS_CACHE_DIR;
+
+// Field-name census of the raw responses (A1 check). Holds names and counts only.
+const census = new Map<string, { present: number; nonEmpty: number }>();
+function addToCensus(raw: unknown) {
+  if (!raw || typeof raw !== "object") return;
+  for (const [k, v] of Object.entries(raw)) {
+    const c = census.get(k) ?? { present: 0, nonEmpty: 0 };
+    c.present++;
+    const empty =
+      v == null ||
+      (typeof v === "string" && v.trim() === "") ||
+      (Array.isArray(v) && v.length === 0) ||
+      (typeof v === "object" && !Array.isArray(v) && Object.keys(v).length === 0);
+    if (!empty) c.nonEmpty++;
+    census.set(k, c);
+  }
+}
 
 const EMAIL_LIKE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
 const PHONE_LIKE = /(?:\+44\s?|\b0)(?:\d\s?){9,10}\b/;
@@ -62,7 +87,7 @@ export function allowlist(raw: unknown): PrsRecord {
   if (raw && typeof raw === "object") {
     for (const k of PRS_ALLOWLIST) {
       const v = (raw as Record<string, unknown>)[k];
-      let keep = typeof v === "string" || typeof v === "number" ? v : null;
+      let keep = typeof v === "string" || typeof v === "number" || typeof v === "boolean" ? v : null;
       if (typeof keep === "string" && (EMAIL_LIKE.test(keep) || PHONE_LIKE.test(keep))) keep = null;
       if (k === "fdRegisteredCoNo" && keep != null && !CO_NUMBER_SHAPE.test(String(keep).replace(/\s/g, ""))) keep = null;
       out[k] = keep;
@@ -116,6 +141,7 @@ async function fetchPage(prefix: string, page: number): Promise<PrsRecord[] | nu
           oddPayloads.push({ prefix, page, shape });
           return null;
         }
+        body.forEach(addToCensus);
         return body.map(allowlist);
       }
     } catch (e) {
@@ -189,6 +215,10 @@ async function main() {
   }
 
   writeFileSync(join(CACHE, "failures.json"), JSON.stringify({ failures, oddPayloads }, null, 1));
+  if (census.size) {
+    const rows = [...census].map(([field, c]) => ({ field, present: c.present, non_empty: c.nonEmpty }));
+    writeFileSync(join(CACHE, "census.json"), JSON.stringify(rows, null, 1));
+  }
   const total = Object.values(counts).reduce((s, c) => s + c.records, 0);
   const notes = JSON.stringify({ counts, requests, failures: failures.length, oddPayloads, stopReason });
   await db
@@ -208,11 +238,11 @@ if (process.argv[1]?.endsWith("prs-fetch.ts")) {
   });
 }
 
-export function readPrsCache(): { prefix: string; record: PrsRecord }[] {
+export function readPrsCache(cacheDir = PRS_CACHE_DIR): { prefix: string; record: PrsRecord }[] {
   const out: { prefix: string; record: PrsRecord }[] = [];
-  if (!existsSync(CACHE)) return out;
-  for (const prefix of readdirSync(CACHE)) {
-    const dir = join(CACHE, prefix);
+  if (!existsSync(cacheDir)) return out;
+  for (const prefix of readdirSync(cacheDir)) {
+    const dir = join(cacheDir, prefix);
     if (!PREFIXES.includes(prefix)) continue;
     for (const f of readdirSync(dir).sort()) {
       for (const record of JSON.parse(readFileSync(join(dir, f), "utf8")) as PrsRecord[]) {
