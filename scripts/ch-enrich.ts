@@ -74,6 +74,12 @@ function writeCache(n: string, k: Kind, c: Cached) {
   writeFileSync(cachePath(n, k), JSON.stringify(c));
 }
 
+/** Field equality for change detection; timestamps compare as instants (Z vs +00:00). */
+function same(col: string, a: unknown, b: unknown): boolean {
+  if (col === "fetched_at" && a && b) return Date.parse(String(a)) === Date.parse(String(b));
+  return canon(a ?? null) === canon(b ?? null);
+}
+
 // --- Rate-limited client.
 class StopSource extends Error {}
 const auth = `Basic ${Buffer.from(`${env("COMPANIES_HOUSE_API_KEY")}:`).toString("base64")}`;
@@ -351,7 +357,7 @@ async function main() {
         if (error) throw new Error(`companies insert: ${error.message}`);
         coIns++;
       } else if (e.manually_edited) coManual++;
-      else if (coCols.some((k) => canon(e[k] ?? null) !== canon(c[k] ?? null))) {
+      else if (coCols.some((k) => !same(k, e[k], c[k]))) {
         const { error } = await db.from("companies").update(c).eq("company_number", c.company_number as string).eq("manually_edited", false);
         if (error) throw new Error(`companies update: ${error.message}`);
         coUpd++;
@@ -369,7 +375,7 @@ async function main() {
         const e = byKey.get(keyCols.map((k) => String(r[k] ?? null)).join("|"));
         if (!e) ins.push(r);
         else if (e.manually_edited) manual++;
-        else if (cols.some((k) => canon(e[k] ?? null) !== canon(r[k] ?? null))) {
+        else if (cols.some((k) => !same(k, e[k], r[k]))) {
           const { error } = await db.from(table).update(r).eq("id", e.id as string).eq("manually_edited", false);
           if (error) throw new Error(`${table} update: ${error.message}`);
           upd++;
