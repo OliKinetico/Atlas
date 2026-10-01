@@ -148,3 +148,15 @@ is_active, low_priority, low_priority_reason, shown_by_default).
 Correction to the narrow-query sweep report: the fetched total across the 78 outcodes is 484,
 not 485 (387 + 97). Narrow and fetched both total 484. No member's in-area status differs
 between its listed and geocoded outcode; the explanation given for the extra 1 was wrong.
+
+### Correction pass load (1 October 2026, 21:01 UTC)
+
+- Re-fetch to `cache/prs-v4/`: 186 requests, 0 failures; 1,724 valid members (+1756, +24178,
+  +54521 outside area; −18269, −24196, −7777 and −48181 outside area).
+- Run 1 (ingest_runs 77dc471c-cc41-47d0-8867-4e447cd0f4df): branches +2 member_address
+  (24178, 1756), 1 update (Robinsons branch label dropped, ruling 14); match_proposals +1
+  (24178 ↔ 12871483); 2 proposals of member 21287 marked as a conflict (ruling 15);
+  raw_source_rows +2. Snapshots: raw_source_rows_snapshot_20261001_210134519,
+  branches_snapshot_20261001_210138844, match_proposals_snapshot_20261001_210148896.
+- Run 2 (ingest_runs 0cf943d9-b88e-4427-9e68-4ba3c68a3320): 0 inserts, 0 updates, 0 marks.
+- Not seen and kept (last_seen_at stays 18:56 UTC): 18269, 24196.
