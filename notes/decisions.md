@@ -88,3 +88,32 @@ names and postcodes. All 70 ID-0 rows match a BranchListJson entry exactly on na
 postcode: the API returns branch entries as top-level rows with no member link. Also: no
 branch ID exists (fdPropertyAgentId = parent fdId on all 77 entries; no other ID key).
 Correction to the earlier A2 report: "0" was counted as a valid member ID.
+
+## 2 October 2026 — rulings on the ruling-5 stop (Oli)
+
+9. **Member-ID-0 rows** are kept in raw_source_rows and excluded from branches, but only when
+   each matches a fetched member's BranchListJson entry on exact name + postcode (otherwise
+   stop: a branch with no known parent). 0, null and empty are invalid member IDs everywhere;
+   enforced in the loader and by check constraints `branches_valid_member_id` and
+   `branches_valid_parent_member_id`.
+10. **Branch key** = member ID + normalised branch label + postcode + occurrence (option b).
+    Occurrence is 1 unless the same member lists the same label and postcode more than once:
+    identical on every kept field → one row, "listed N times" recorded; any difference → both
+    rows (occurrence 1, 2 ordered by address text) plus a branch_duplicate proposal. List
+    position is evidence only. A branch missing from a later load is never deleted; its
+    `last_seen_at` simply stops advancing (column already existed).
+11. **The 9 identical repeats** collapse to one each.
+12. **Replaces part of ruling 2:** fdBranchName is a location label, stored in `branch_label`;
+    `trading_name` stays null on branch rows. Branch rows carry the parent member's legal name
+    (`legal_name_as_listed`) and listed company number (`company_number_listed`), refreshed on
+    each load. Display name = parent legal name + " - " + branch label. In Phase 4 branch rows
+    link to a company only through the parent member; never name-match on the branch label.
+    No duplicate proposals between a member's own address row and its own branch rows.
+13. **Display-name check** `branches_has_display_name`: a trading name or a legal name must be
+    present and non-blank. Branch rows satisfy it through the parent's legal name.
+
+Migration 20261002000000 was amended before being applied (new columns branch_label,
+redress_parent_member_id, branch_occurrence, branch_key, company_number_listed, is_active,
+likely_rmc_basis, low_priority, low_priority_reason; the checks above; view columns
+display_name, display_name_note, branch_label, redress_member_id, redress_parent_member_id,
+is_active, low_priority, low_priority_reason, shown_by_default).
