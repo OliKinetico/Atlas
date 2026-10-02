@@ -161,29 +161,32 @@ between its listed and geocoded outcode; the explanation given for the extra 1 w
 - Run 2 (ingest_runs 0cf943d9-b88e-4427-9e68-4ba3c68a3320): 0 inserts, 0 updates, 0 marks.
 - Not seen and kept (last_seen_at stays 18:56 UTC): 18269, 24196.
 
-## 2 October 2026 — Phase 4 provisional rulings (unattended run; need Oli's confirmation)
+## 2 October 2026 — Phase 4 provisional rulings P1–P8 (CONFIRMED by Oli, 2 October 2026)
+
+Status: P1, P2, P3, P4, P5, P6, P7 and P8 below were taken provisionally during the unattended
+Phase 4 run and were confirmed by Oli on 2 October 2026. They are now binding rulings.
 
 Each takes the most cautious, reversible option. All Phase 4 writes are snapshotted first and
 can be undone with the commands stored in ingest_runs.
 
-- **P1 — branch-list rows link through the parent member only.** Options: (a) match branch rows
+- **P1 (confirmed) — branch-list rows link through the parent member only.** Options: (a) match branch rows
   on their own label/postcode; (b) inherit the parent member's exact link. Chose (b): ruling 12
   forbids name-matching on the branch label. For the 2 parents with no member row in the area
   (14143, 19425) the parent's name, postcode and listed number come from their allowlisted raw
   record. Proposals for those parents attach to their branch rows.
-- **P2 — conflicting exact signals are never auto-linked.** Options: (a) link on the listed
+- **P2 (confirmed) — conflicting exact signals are never auto-linked.** Options: (a) link on the listed
   company number whenever it exists in the snapshot, as the plan allows; (b) link only when
   every exact signal (listed number; exact name + postcode) points at one company and the
   member has no pending duplicate proposal against a different company. Chose (b): it applies
   ruling 15 to links as well as proposals. Every candidate of a conflicted member becomes a
   pending proposal carrying `evidence.conflict`. Currently affects member 21287 only.
-- **P3 — what generates branch_company proposals.** For members with no exact link (and for
+- **P3 (confirmed) — what generates branch_company proposals.** For members with no exact link (and for
   conflicts): (i) exact normalised name at a different postcode; (ii) a different name with
   Jaro-Winkler similarity >= 0.9 at the same registered-office postcode. Options considered:
   similarity over the whole snapshot (too broad, noisy) or no similarity at all (misses
   near-identical names). Chose same-postcode similarity: narrow and reviewable. Members with an
   exact link get no extra proposals.
-- **P4 — Phase 4 matching is insert-only.** New `companies` rows (from the bulk snapshot, minus
+- **P4 (confirmed) — Phase 4 matching is insert-only.** New `companies` rows (from the bulk snapshot, minus
   RegAddress.CareOf), `branch_company_links` and `match_proposals` are inserted; existing rows are
   never changed or deleted by the matcher. Company details are refreshed only by the enrichment
   step from the CH API. Branch rows with `manually_edited = true` get no new link.
@@ -191,15 +194,15 @@ can be undone with the commands stored in ingest_runs.
   that exists in the snapshot, the plan's exact tier links it even if the company's name differs
   from the member's legal name. These links carry `evidence.name_matches = false` and are listed
   in the Phase 4 report for spot-checking.
-- **P5 — which companies are enriched from the CH API.** Options: all 5,134 linked companies;
+- **P5 (confirmed) — which companies are enriched from the CH API.** Options: all 5,134 linked companies;
   or only those linked to an in-scope branch with `likely_rmc = false` (0R.5). Chose the latter
   (2,829 companies): it covers every Surrey branch on the map and roughly halves the API calls.
   The other 2,305 linked companies (outside Surrey or likely residents' management companies)
   keep their bulk-snapshot company row with no officers or PSCs; they can be enriched later.
-- **P6 — CH API pace.** At most 500 requests in any 300-second window and at least 610 ms between
+- **P6 (confirmed) — CH API pace.** At most 500 requests in any 300-second window and at least 610 ms between
   requests (documented limit: 600 per 5 minutes). A 429, 401 or 403 stops the source at once
   (Phase 4 brief: stop a source if rate-limited), rather than backing off and continuing.
-- **P7 — what is cached and stored from the CH API.** Officers: name, role, appointed/resigned
+- **P7 (confirmed) — what is cached and stored from the CH API.** Officers: name, role, appointed/resigned
   dates, month and year of birth. PSCs: name, kind, notified/ceased dates, corporate
   identification. Addresses, nationality, occupation and country of residence are dropped
   before caching. PSC entries with no name (e.g. super-secure PSCs) are not stored, because
@@ -207,7 +210,7 @@ can be undone with the commands stored in ingest_runs.
   chain follows an active corporate PSC only when the source gives a UK register and a
   Companies House-shaped number, and only when it is the company's single such PSC; with two
   or more, the candidates are recorded and the chain stops (no guess at which one controls).
-- **P8 — Vercel framework.** Every Vercel deployment of this branch failed with "No Output
+- **P8 (confirmed) — Vercel framework.** Every Vercel deployment of this branch failed with "No Output
   Directory named 'public'" because the project's framework preset is unset. Options: change
   the project setting in Oli's Vercel account, or add `vercel.json` with `"framework":
   "nextjs"` to the repo. Chose the repo file: visible in the PR, reversible by deleting it,
