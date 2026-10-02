@@ -1,0 +1,502 @@
+{
+ "inscope": {
+  "CR3": [
+   "Croydon",
+   "Tandridge"
+  ],
+  "CR5": [
+   "Croydon",
+   "Reigate and Banstead",
+   "Sutton"
+  ],
+  "CR6": [
+   "Bromley",
+   "Croydon",
+   "Tandridge"
+  ],
+  "CR8": [
+   "Croydon",
+   "Sutton",
+   "Tandridge"
+  ],
+  "GU1": [
+   "Guildford"
+  ],
+  "GU2": [
+   "Guildford"
+  ],
+  "GU3": [
+   "Guildford",
+   "Woking"
+  ],
+  "GU4": [
+   "Guildford",
+   "Waverley",
+   "Woking"
+  ],
+  "GU5": [
+   "Guildford",
+   "Waverley"
+  ],
+  "GU6": [
+   "Chichester",
+   "Waverley"
+  ],
+  "GU7": [
+   "Guildford",
+   "Waverley"
+  ],
+  "GU8": [
+   "Chichester",
+   "Guildford",
+   "Waverley"
+  ],
+  "GU9": [
+   "Waverley"
+  ],
+  "GU10": [
+   "East Hampshire",
+   "Guildford",
+   "Hart",
+   "Waverley"
+  ],
+  "GU12": [
+   "Guildford",
+   "Rushmoor",
+   "Surrey Heath"
+  ],
+  "GU14": [
+   "Guildford",
+   "Hart",
+   "Rushmoor"
+  ],
+  "GU15": [
+   "Bracknell Forest",
+   "Surrey Heath"
+  ],
+  "GU16": [
+   "Guildford",
+   "Rushmoor",
+   "Surrey Heath"
+  ],
+  "GU18": [
+   "Surrey Heath",
+   "Woking"
+  ],
+  "GU19": [
+   "Bracknell Forest",
+   "Surrey Heath"
+  ],
+  "GU20": [
+   "Bracknell Forest",
+   "Surrey Heath",
+   "Woking"
+  ],
+  "GU21": [
+   "Surrey Heath",
+   "Woking"
+  ],
+  "GU22": [
+   "Woking"
+  ],
+  "GU23": [
+   "Guildford",
+   "Woking"
+  ],
+  "GU24": [
+   "Guildford",
+   "Runnymede",
+   "Surrey Heath",
+   "Woking"
+  ],
+  "GU25": [
+   "Runnymede"
+  ],
+  "GU26": [
+   "East Hampshire",
+   "Waverley"
+  ],
+  "GU27": [
+   "Chichester",
+   "East Hampshire",
+   "Waverley"
+  ],
+  "KT4": [
+   "Epsom and Ewell",
+   "Kingston upon Thames",
+   "Sutton"
+  ],
+  "KT6": [
+   "Elmbridge",
+   "Kingston upon Thames"
+  ],
+  "KT7": [
+   "Elmbridge",
+   "Kingston upon Thames"
+  ],
+  "KT8": [
+   "Elmbridge",
+   "Richmond upon Thames"
+  ],
+  "KT9": [
+   "Elmbridge",
+   "Kingston upon Thames"
+  ],
+  "KT10": [
+   "Elmbridge"
+  ],
+  "KT11": [
+   "Elmbridge",
+   "Guildford",
+   "Mole Valley"
+  ],
+  "KT12": [
+   "Elmbridge",
+   "Spelthorne"
+  ],
+  "KT13": [
+   "Elmbridge",
+   "Runnymede"
+  ],
+  "KT14": [
+   "Elmbridge",
+   "Runnymede",
+   "Woking"
+  ],
+  "KT15": [
+   "Runnymede",
+   "Woking"
+  ],
+  "KT16": [
+   "Runnymede",
+   "Spelthorne"
+  ],
+  "KT17": [
+   "Epsom and Ewell",
+   "Reigate and Banstead",
+   "Sutton"
+  ],
+  "KT18": [
+   "Epsom and Ewell",
+   "Kingston upon Thames",
+   "Mole Valley",
+   "Reigate and Banstead"
+  ],
+  "KT19": [
+   "Epsom and Ewell",
+   "Kingston upon Thames"
+  ],
+  "KT20": [
+   "Mole Valley",
+   "Reigate and Banstead"
+  ],
+  "KT21": [
+   "Mole Valley"
+  ],
+  "KT22": [
+   "Elmbridge",
+   "Kingston upon Thames",
+   "Mole Valley"
+  ],
+  "KT23": [
+   "Guildford",
+   "Mole Valley"
+  ],
+  "KT24": [
+   "Guildford"
+  ],
+  "RH1": [
+   "Reigate and Banstead",
+   "Tandridge"
+  ],
+  "RH2": [
+   "Mole Valley",
+   "Reigate and Banstead"
+  ],
+  "RH3": [
+   "Mole Valley"
+  ],
+  "RH4": [
+   "Mole Valley"
+  ],
+  "RH5": [
+   "Guildford",
+   "Horsham",
+   "Mole Valley",
+   "Waverley"
+  ],
+  "RH6": [
+   "Crawley",
+   "Mole Valley",
+   "Reigate and Banstead",
+   "Tandridge"
+  ],
+  "RH7": [
+   "Tandridge"
+  ],
+  "RH8": [
+   "Tandridge"
+  ],
+  "RH9": [
+   "Reigate and Banstead",
+   "Tandridge"
+  ],
+  "RH10": [
+   "Crawley",
+   "Mid Sussex",
+   "Tandridge"
+  ],
+  "RH12": [
+   "Horsham",
+   "Mole Valley",
+   "Waverley"
+  ],
+  "RH14": [
+   "Chichester",
+   "Horsham",
+   "Waverley"
+  ],
+  "RH19": [
+   "Mid Sussex",
+   "Tandridge",
+   "Wealden"
+  ],
+  "SL4": [
+   "Bracknell Forest",
+   "Buckinghamshire",
+   "Runnymede",
+   "Slough",
+   "Windsor and Maidenhead"
+  ],
+  "SL5": [
+   "Bracknell Forest",
+   "Runnymede",
+   "Surrey Heath",
+   "Windsor and Maidenhead"
+  ],
+  "SM2": [
+   "Epsom and Ewell",
+   "Reigate and Banstead",
+   "Sutton"
+  ],
+  "SM3": [
+   "Epsom and Ewell",
+   "Merton",
+   "Sutton"
+  ],
+  "SM5": [
+   "Reigate and Banstead",
+   "Sutton"
+  ],
+  "SM7": [
+   "Reigate and Banstead",
+   "Sutton"
+  ],
+  "TN8": [
+   "Sevenoaks",
+   "Tandridge",
+   "Wealden"
+  ],
+  "TN16": [
+   "Bromley",
+   "Sevenoaks",
+   "Tandridge"
+  ],
+  "TW6": [
+   "Hillingdon",
+   "Hounslow",
+   "Spelthorne"
+  ],
+  "TW12": [
+   "Richmond upon Thames",
+   "Spelthorne"
+  ],
+  "TW14": [
+   "Hillingdon",
+   "Hounslow",
+   "Spelthorne"
+  ],
+  "TW15": [
+   "Hounslow",
+   "Spelthorne"
+  ],
+  "TW16": [
+   "Elmbridge",
+   "Spelthorne"
+  ],
+  "TW17": [
+   "Elmbridge",
+   "Spelthorne"
+  ],
+  "TW18": [
+   "Runnymede",
+   "Spelthorne",
+   "Windsor and Maidenhead"
+  ],
+  "TW19": [
+   "Hillingdon",
+   "Hounslow",
+   "Runnymede",
+   "Spelthorne",
+   "Windsor and Maidenhead"
+  ],
+  "TW20": [
+   "Runnymede"
+  ]
+ },
+ "straddle": {
+  "GU6": [
+   "Chichester"
+  ],
+  "GU8": [
+   "Chichester"
+  ],
+  "GU10": [
+   "East Hampshire",
+   "Hart"
+  ],
+  "GU12": [
+   "Rushmoor"
+  ],
+  "GU14": [
+   "Hart",
+   "Rushmoor"
+  ],
+  "GU15": [
+   "Bracknell Forest"
+  ],
+  "GU16": [
+   "Rushmoor"
+  ],
+  "GU19": [
+   "Bracknell Forest"
+  ],
+  "GU20": [
+   "Bracknell Forest"
+  ],
+  "GU26": [
+   "East Hampshire"
+  ],
+  "GU27": [
+   "Chichester",
+   "East Hampshire"
+  ],
+  "KT4": [
+   "Kingston upon Thames",
+   "Sutton"
+  ],
+  "KT6": [
+   "Kingston upon Thames"
+  ],
+  "KT7": [
+   "Kingston upon Thames"
+  ],
+  "KT8": [
+   "Richmond upon Thames"
+  ],
+  "KT9": [
+   "Kingston upon Thames"
+  ],
+  "KT17": [
+   "Sutton"
+  ],
+  "KT18": [
+   "Kingston upon Thames"
+  ],
+  "KT19": [
+   "Kingston upon Thames"
+  ],
+  "KT22": [
+   "Kingston upon Thames"
+  ],
+  "RH5": [
+   "Horsham"
+  ],
+  "RH6": [
+   "Crawley"
+  ],
+  "RH10": [
+   "Crawley",
+   "Mid Sussex"
+  ],
+  "RH12": [
+   "Horsham"
+  ],
+  "RH14": [
+   "Chichester",
+   "Horsham"
+  ],
+  "RH19": [
+   "Mid Sussex",
+   "Wealden"
+  ],
+  "TW6": [
+   "Hillingdon",
+   "Hounslow"
+  ],
+  "TW12": [
+   "Richmond upon Thames"
+  ],
+  "TW14": [
+   "Hillingdon",
+   "Hounslow"
+  ],
+  "TW15": [
+   "Hounslow"
+  ],
+  "TW18": [
+   "Windsor and Maidenhead"
+  ],
+  "TW19": [
+   "Hillingdon",
+   "Hounslow",
+   "Windsor and Maidenhead"
+  ],
+  "SM2": [
+   "Sutton"
+  ],
+  "SM3": [
+   "Merton",
+   "Sutton"
+  ],
+  "SM5": [
+   "Sutton"
+  ],
+  "SM7": [
+   "Sutton"
+  ],
+  "CR3": [
+   "Croydon"
+  ],
+  "CR5": [
+   "Croydon",
+   "Sutton"
+  ],
+  "CR6": [
+   "Bromley",
+   "Croydon"
+  ],
+  "CR8": [
+   "Croydon",
+   "Sutton"
+  ],
+  "TN8": [
+   "Sevenoaks",
+   "Wealden"
+  ],
+  "TN16": [
+   "Bromley",
+   "Sevenoaks"
+  ],
+  "SL4": [
+   "Bracknell Forest",
+   "Buckinghamshire",
+   "Slough",
+   "Windsor and Maidenhead"
+  ],
+  "SL5": [
+   "Bracknell Forest",
+   "Windsor and Maidenhead"
+  ]
+ }
+}
